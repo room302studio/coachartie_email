@@ -1,0 +1,20 @@
+# Cloudflare Workers Configuration for Coach Artie Email Worker
+
+name = "coachartie-email-worker"
+main = "../cloudflare-email-worker.js"
+compatibility_date = "2024-01-01"
+
+# Environment Variables for the Worker
+[env.production.vars]
+WEBHOOK_URL = "https://email.coachartiebot.com/webhook/email"
+# Set these via `wrangler secret put` command:
+# wrangler secret put WEBHOOK_SECRET
+# wrangler secret put APPROVED_RECIPIENTS (optional)
+
+[env.staging.vars]
+WEBHOOK_URL = "https://staging-email.coachartiebot.com/webhook/email"
+
+# Email routing configuration
+[[routes]]
+pattern = "email.coachartiebot.com/*"
+zone_name = "coachartiebot.com"
