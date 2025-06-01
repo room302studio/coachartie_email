@@ -1,58 +1,114 @@
 # Coach Artie Email Interface
 
-Enable Coach Artie to conduct 1:1 coaching conversations via email, maintaining context across long-running threads just like the Discord interface.
+🤖 **TL;DR**: Email your AI coach at `coach@yourdomain.com` and get intelligent responses with full conversation memory. Just like Discord but via email.
 
-## Architecture
+## What This Does
 
-```
-User Email → Cloudflare Email Routing → Email Worker → VPS Webhook → Coach Artie Core → Resend API → User
-                                              ↓                           ↑
-                                        Thread Memory ←────────────────────┘
-```
+- Users email Coach Artie → Get intelligent coaching responses
+- Remembers conversation history (like Discord channels)
+- Uses same AI brain as Discord version
+- Professional email formatting
 
-## Quick Start
+## 30-Minute Setup Guide 🚀
 
-### 1. VPS Setup (email.coachartiebot.com)
+### Step 1: Get Your API Keys (5 minutes)
+
+**Resend Account** (for sending emails):
+1. Go to https://resend.com → Sign up
+2. Add your domain (e.g., `coachartiebot.com`)
+3. Verify domain ownership (add DNS records)
+4. Create API key → Copy it
+
+**Supabase** (for memory/threads):
+1. Go to https://supabase.com → Create project
+2. Go to Settings → API → Copy `URL` and `anon key`
+
+### Step 2: Deploy to Your Server (10 minutes)
 
 ```bash
-# Clone and install
-git clone <repo>
+# SSH into your server
+ssh root@your-server.com
+
+# Clone and setup
+git clone https://github.com/room302studio/coachartie_email.git
 cd coachartie_email
 npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your API keys
+nano .env  # Fill in your API keys (see below)
+
+# Setup database
+# Copy the SQL from "Database Schema" section below
+# Run it in your Supabase SQL editor
 
 # Build and start
 npm run build
 npm start
 ```
 
-### 2. Cloudflare Email Worker Setup
-
+**Your `.env` file should look like:**
 ```bash
-# Install Wrangler CLI
-npm install -g wrangler
-
-# Authenticate with Cloudflare
-wrangler auth login
-
-# Deploy the email worker
-cd cloudflare
-wrangler deploy
-
-# Set environment secrets
-wrangler secret put WEBHOOK_SECRET
-wrangler secret put APPROVED_RECIPIENTS  # Optional
+PORT=3000
+RESEND_API_KEY=re_your_key_here
+FROM_EMAIL=coach@yourdomain.com
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key_here
+CAPABILITIES_URL=http://localhost:3000  # or your capabilities server
+WEBHOOK_SECRET=make-up-a-random-secret
+CLOUDFLARE_WEBHOOK_SECRET=same-secret-as-above
 ```
 
-### 3. Cloudflare Email Routing Configuration
+### Step 3: Setup Cloudflare Email Worker (10 minutes)
 
-1. Go to your Cloudflare dashboard
-2. Navigate to Email → Email Routing
-3. Add destination address: `coach@yourdomain.com`
-4. Create routing rule: Route to Worker → `coachartie-email-worker`
+```bash
+# Install Cloudflare CLI
+npm install -g wrangler
+
+# Login to Cloudflare
+wrangler auth login
+
+# Edit the worker config
+cd cloudflare
+nano wrangler.toml
+# Change WEBHOOK_URL to: https://your-server.com/webhook/email
+
+# Deploy the worker
+wrangler deploy
+
+# Set secrets
+wrangler secret put WEBHOOK_SECRET
+# Enter the same secret from your .env file
+wrangler secret put APPROVED_RECIPIENTS
+# Enter: coach@yourdomain.com,support@yourdomain.com
+```
+
+### Step 4: Configure Cloudflare Email Routing (5 minutes)
+
+1. **Cloudflare Dashboard** → Your domain → **Email** → **Email Routing**
+2. **Enable Email Routing** (if not already)
+3. **Destination addresses** → **Add address** → `coach@yourdomain.com`
+4. **Routing rules** → **Create rule**:
+   - **Name**: Coach Artie
+   - **When**: Custom address → `coach@yourdomain.com`
+   - **Then**: Send to Worker → `coachartie-email-worker`
+   - **Save**
+
+### Step 5: Test It 📧
+
+```bash
+# Test the webhook
+npm run email:test
+
+# Send a real email
+# Email: coach@yourdomain.com
+# Subject: Hello Coach Artie
+# Body: Can you help me with goal setting?
+```
+
+## Done! 🎉
+
+People can now email `coach@yourdomain.com` and get AI coaching responses with full conversation memory.
 
 ## Environment Variables
 
@@ -165,27 +221,99 @@ Discord: /link email user@example.com
 - Health check endpoint for uptime monitoring
 - Error notifications via email
 
-## Troubleshooting
+## 🔧 When Shit Breaks (Troubleshooting)
 
-### Common Issues
+### "I sent an email but got no response"
 
-1. **Emails not reaching webhook**
-   - Check Cloudflare Email Routing configuration
-   - Verify worker deployment and logs
-   - Ensure webhook URL is accessible
+**Check 1**: Is your server running?
+```bash
+curl http://your-server.com/health
+# Should return: {"status":"ok",...}
+```
 
-2. **Authentication errors**
-   - Verify WEBHOOK_SECRET matches in both worker and server
-   - Check cf-webhook-auth header in requests
+**Check 2**: Are emails reaching Cloudflare?
+```bash
+wrangler tail  # Watch live logs
+# Send test email and see if logs show up
+```
 
-3. **Resend API errors**
-   - Verify RESEND_API_KEY is valid
-   - Ensure FROM_EMAIL domain is verified in Resend
-   - Check Resend API quota
+**Check 3**: Is the webhook working?
+```bash
+npm run email:test
+# Should see "✅ Test email webhook successful!"
+```
 
-4. **Thread management issues**
-   - Verify Supabase connection and table schema
-   - Check database permissions
+### "Authentication errors" 
+
+Your `WEBHOOK_SECRET` needs to match in 3 places:
+- Your server `.env` file
+- Cloudflare worker secrets (`wrangler secret put WEBHOOK_SECRET`)
+- They should be EXACTLY the same string
+
+### "Resend API errors"
+
+1. **Domain not verified**: Go to Resend dashboard → Domains → Verify your domain
+2. **Wrong API key**: Create new key in Resend dashboard → API Keys
+3. **Wrong FROM_EMAIL**: Must match your verified domain (e.g., `coach@yourdomain.com`)
+
+### "Database errors"
+
+**Check 1**: Did you create the table?
+```sql
+-- Run this in Supabase SQL editor:
+CREATE TABLE email_threads (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_message_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  message_count INTEGER DEFAULT 0
+);
+```
+
+**Check 2**: Are your Supabase credentials correct?
+- `SUPABASE_URL` should start with `https://`
+- `SUPABASE_ANON_KEY` should be the "anon public" key, not service role
+
+### "Worker deployment failed"
+
+```bash
+# Make sure you're logged in
+wrangler auth login
+
+# Check your wrangler.toml has the right webhook URL
+cd cloudflare
+cat wrangler.toml
+
+# Deploy again
+wrangler deploy
+```
+
+### "Still broken?"
+
+**Check logs**:
+```bash
+# Server logs
+tail -f logs/combined.log
+
+# Worker logs  
+wrangler tail
+
+# Health check
+curl http://your-server.com/health
+```
+
+**Test in isolation**:
+```bash
+# Test just the webhook
+npm run email:test
+
+# Test just Resend API
+curl -X POST https://api.resend.com/emails \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"from":"coach@yourdomain.com","to":"test@gmail.com","subject":"test","text":"test"}'
+```
 
 ### Logs
 
