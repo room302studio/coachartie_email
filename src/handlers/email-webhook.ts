@@ -14,6 +14,7 @@ import { parseIncomingEmail } from '../services/email-parser.js';
 import { sendEmailResponse } from '../services/email-sender.js';
 import { processWithCoachArtie } from '../services/coach-artie-client.js';
 import { getOrCreateThread } from '../services/thread-manager.js';
+import { resolveUserIdentity } from '../services/identity-resolver.js';
 
 export async function emailWebhookHandler(req: Request, res: Response): Promise<Response> {
   try {
@@ -37,19 +38,30 @@ export async function emailWebhookHandler(req: Request, res: Response): Promise<
       messageId: emailData.messageId
     });
 
-    // Get or create conversation thread
-    const thread = await getOrCreateThread(emailData.from, emailData.threadId);
+    // Resolve email to canonical user ID
+    const identity = await resolveUserIdentity(emailData.from);
+    const canonicalUserId = identity.canonicalUserId || emailData.from;
     
-    // Process with Coach Artie
+    logger.info('Identity resolved for email', {
+      email: emailData.from,
+      canonicalUserId,
+      isNewUser: identity.isNewUser
+    });
+
+    // Get or create conversation thread
+    const thread = await getOrCreateThread(canonicalUserId, emailData.threadId);
+    
+    // Process with Coach Artie using canonical user ID
     const response = await processWithCoachArtie({
       message: emailData.body,
-      userId: emailData.from,
+      userId: canonicalUserId,
       threadId: thread.id,
       channel: 'email',
       metadata: {
         subject: emailData.subject,
         messageId: emailData.messageId,
-        inReplyTo: emailData.inReplyTo
+        inReplyTo: emailData.inReplyTo,
+        originalEmail: emailData.from
       }
     });
 
