@@ -7,9 +7,9 @@
 
 import express from 'express';
 import dotenv from 'dotenv';
-import { logger } from './services/logger';
-import { emailWebhookHandler } from './handlers/email-webhook';
-import { healthCheck } from './handlers/health';
+import { logger } from './services/logger.js';
+import { emailWebhookHandler } from './handlers/email-webhook.js';
+import { healthCheck } from './handlers/health.js';
 
 // Load environment variables
 dotenv.config();

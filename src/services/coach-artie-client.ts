@@ -5,7 +5,7 @@
  * and get AI responses. Uses the same API as the Discord interface.
  */
 
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 export interface CoachArtieRequest {
   message: string;

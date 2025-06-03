@@ -7,27 +7,24 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const WEBHOOK_URL = process.env.TEST_WEBHOOK_URL || 'http://localhost:3000/webhook/email';
-const WEBHOOK_SECRET = process.env.CLOUDFLARE_WEBHOOK_SECRET || 'test-secret';
+const WEBHOOK_URL = process.env.TEST_WEBHOOK_URL || 'http://localhost:3000/webhook';
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'test-secret';
 
 const testEmail = {
   from: 'test@example.com',
   to: 'coach@coachartiebot.com',
   subject: 'Test Email for Coach Artie',
   messageId: `<test-${Date.now()}@example.com>`,
+  inReplyTo: null,
   date: new Date().toISOString(),
-  body: {
-    text: 'Hello Coach Artie! This is a test email to verify the webhook is working correctly. Can you help me with some coaching questions?',
-    html: null
-  },
-  headers: {
-    'from': 'test@example.com',
-    'to': 'coach@coachartiebot.com',
-    'subject': 'Test Email for Coach Artie',
-    'date': new Date().toISOString(),
-    'message-id': `<test-${Date.now()}@example.com>`
-  },
-  rawSize: 256
+  raw: `From: test@example.com
+To: coach@coachartiebot.com
+Subject: Test Email for Coach Artie
+Date: ${new Date().toISOString()}
+Message-ID: <test-${Date.now()}@example.com>
+
+Hello Coach Artie! This is a test email to verify the webhook is working correctly. Can you help me with some coaching questions?`,
+  timestamp: new Date().toISOString()
 };
 
 async function testWebhook() {
@@ -40,8 +37,7 @@ async function testWebhook() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'cf-webhook-auth': WEBHOOK_SECRET,
-        'Authorization': `Bearer ${WEBHOOK_SECRET}`
+        'X-Webhook-Secret': WEBHOOK_SECRET
       },
       body: JSON.stringify(testEmail)
     });

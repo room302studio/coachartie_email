@@ -14,76 +14,36 @@
 
 export default {
   async email(message, env, ctx) {
-    try {
-      console.log('Processing incoming email', {
-        from: message.from,
-        to: message.to,
-        subject: message.headers.get('subject')
-      });
-
-      // Optional: Filter by approved recipients
-      if (env.APPROVED_RECIPIENTS) {
-        const approvedList = env.APPROVED_RECIPIENTS.split(',').map(email => email.trim());
-        if (!approvedList.includes(message.to)) {
-          console.log('Recipient not in approved list, rejecting', {
-            to: message.to,
-            approved: approvedList
-          });
-          await message.setReject('Email address not configured for Coach Artie');
-          return;
-        }
-      }
-
-      // Read the email content
-      const reader = message.raw.getReader();
-      const { value } = await reader.read();
-      const rawEmail = new TextDecoder().decode(value);
-
-      // Parse email headers and body
-      const emailData = await parseEmailMessage(message, rawEmail);
-      
-      // Forward to webhook
-      const webhookResponse = await forwardToWebhook(emailData, env);
-      
-      if (webhookResponse.success) {
-        console.log('Email successfully forwarded to webhook', {
-          from: message.from,
-          webhookResponse: webhookResponse.messageId
-        });
-      } else {
-        console.error('Webhook forwarding failed', {
-          from: message.from,
-          error: webhookResponse.error
-        });
-        
-        // Send error response to sender
-        await message.reply({
-          from: message.to,
-          to: message.from,
-          subject: 'Re: ' + message.headers.get('subject'),
-          text: 'Sorry, I\'m temporarily unable to process your email. Please try again later.'
-        });
-      }
-
-    } catch (error) {
-      console.error('Email worker error', {
-        error: error.message,
-        stack: error.stack,
-        from: message.from
-      });
-      
-      // Try to send error response
-      try {
-        await message.reply({
-          from: message.to,
-          to: message.from,
-          subject: 'Re: ' + message.headers.get('subject'),
-          text: 'Sorry, there was an error processing your email. Please try again later.'
-        });
-      } catch (replyError) {
-        console.error('Failed to send error reply', { error: replyError.message });
-      }
-    }
+    // Extract email content
+    const rawEmail = await new Response(message.raw).text();
+    
+    // Prepare webhook payload
+    const payload = {
+      from: message.from,
+      to: message.to,
+      subject: message.headers.get('subject'),
+      messageId: message.headers.get('message-id'),
+      inReplyTo: message.headers.get('in-reply-to'),
+      date: message.headers.get('date'),
+      raw: rawEmail,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Send to your webhook
+    const webhookResponse = await fetch('https://email.coachartiebot.com/webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Secret': env.WEBHOOK_SECRET || 'your-secret-here'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    // Log the result (optional)
+    console.log(`Webhook response: ${webhookResponse.status}`);
+    
+    // Forward to a backup email if you want
+    // await message.forward("backup@gmail.com");
   }
 };
 

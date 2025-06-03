@@ -17,7 +17,7 @@
  * }
  */
 
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 export interface ParsedEmail {
   from: string;
@@ -36,8 +36,8 @@ export async function parseIncomingEmail(
 ): Promise<ParsedEmail | null> {
   try {
     // Verify webhook authentication
-    const authHeader = headers['cf-webhook-auth'];
-    const expectedSecret = process.env.CLOUDFLARE_WEBHOOK_SECRET;
+    const authHeader = headers['x-webhook-secret'];
+    const expectedSecret = process.env.WEBHOOK_SECRET;
     
     if (expectedSecret && authHeader !== expectedSecret) {
       logger.error('Invalid webhook authentication', { authHeader });
@@ -61,8 +61,8 @@ export async function parseIncomingEmail(
     // Extract thread ID from subject or in-reply-to
     const threadId = extractThreadId(emailData.subject, emailData.inReplyTo);
 
-    // Get the plain text body (prefer text over HTML for processing)
-    const bodyText = emailData.body?.text || stripHtml(emailData.body?.html) || '';
+    // Parse the raw email to extract body text
+    const bodyText = parseEmailBody(emailData.raw);
 
     const parsed: ParsedEmail = {
       from: emailData.from,
@@ -105,6 +105,44 @@ function extractThreadId(subject: string, inReplyTo?: string): string | undefine
   
   // For new conversations, no thread ID yet
   return undefined;
+}
+
+/**
+ * Parse raw email body text from email content
+ */
+function parseEmailBody(rawEmail: string): string {
+  const lines = rawEmail.split('\n');
+  let inBody = false;
+  let bodyLines = [];
+  let contentType = 'text/plain';
+
+  for (const line of lines) {
+    // Headers end at first empty line
+    if (!inBody && line.trim() === '') {
+      inBody = true;
+      continue;
+    }
+
+    // Check for content type in headers
+    if (!inBody && line.toLowerCase().includes('content-type:')) {
+      if (line.toLowerCase().includes('text/html')) {
+        contentType = 'text/html';
+      }
+    }
+
+    if (inBody) {
+      bodyLines.push(line);
+    }
+  }
+
+  let bodyText = bodyLines.join('\n').trim();
+
+  // If HTML, do basic conversion to text
+  if (contentType === 'text/html') {
+    bodyText = stripHtml(bodyText);
+  }
+
+  return bodyText;
 }
 
 /**

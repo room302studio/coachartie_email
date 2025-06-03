@@ -3,7 +3,7 @@
  */
 
 import { Request, Response } from 'express';
-import { logger } from '../services/logger';
+import { logger } from '../services/logger.js';
 
 export async function healthCheck(req: Request, res: Response) {
   try {

@@ -1,13 +1,13 @@
 /**
  * Thread Manager Service
  * 
- * Manages email conversation threads using Supabase.
- * Similar to Discord thread management but for email conversations.
+ * Simplified email thread tracking using logs table.
+ * Tracks email conversations without complex thread management.
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { logger } from './logger';
-import { Database } from '../../database.types';
+import { logger } from './logger.js';
+import { Database } from '../database.types.js';
 
 const supabase = createClient<Database>(
   process.env.SUPABASE_URL!,
@@ -19,124 +19,57 @@ export interface EmailThread {
   userEmail: string;
   subject: string;
   createdAt: string;
-  lastMessageAt: string;
-  messageCount: number;
 }
 
 export async function getOrCreateThread(
   userEmail: string, 
-  existingThreadId?: string
+  subject?: string
 ): Promise<EmailThread> {
   try {
-    // If we have an existing thread ID, try to find it
-    if (existingThreadId) {
-      const { data: existingThread } = await supabase
-        .from('email_threads')
-        .select('*')
-        .eq('id', existingThreadId)
-        .eq('user_email', userEmail)
-        .single();
-
-      if (existingThread) {
-        // Update last message timestamp
-        await supabase
-          .from('email_threads')
-          .update({ 
-            last_message_at: new Date().toISOString(),
-            message_count: existingThread.message_count + 1
-          })
-          .eq('id', existingThreadId);
-
-        return {
-          id: existingThread.id,
-          userEmail: existingThread.user_email,
-          subject: existingThread.subject,
-          createdAt: existingThread.created_at,
-          lastMessageAt: new Date().toISOString(),
-          messageCount: existingThread.message_count + 1
-        };
-      }
-    }
-
-    // Check for recent thread for this user (within last 24 hours)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentThread } = await supabase
-      .from('email_threads')
-      .select('*')
-      .eq('user_email', userEmail)
-      .gte('last_message_at', oneDayAgo)
-      .order('last_message_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (recentThread) {
-      // Use existing recent thread
-      await supabase
-        .from('email_threads')
-        .update({ 
-          last_message_at: new Date().toISOString(),
-          message_count: recentThread.message_count + 1
-        })
-        .eq('id', recentThread.id);
-
-      return {
-        id: recentThread.id,
-        userEmail: recentThread.user_email,
-        subject: recentThread.subject,
-        createdAt: recentThread.created_at,
-        lastMessageAt: new Date().toISOString(),
-        messageCount: recentThread.message_count + 1
-      };
-    }
-
-    // Create new thread
-    const newThread = {
-      user_email: userEmail,
-      subject: 'Coaching Conversation',
-      created_at: new Date().toISOString(),
-      last_message_at: new Date().toISOString(),
-      message_count: 1
-    };
-
-    const { data: createdThread, error } = await supabase
-      .from('email_threads')
-      .insert(newThread)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to create thread: ${error.message}`);
-    }
-
-    logger.info('Created new email thread', {
-      threadId: createdThread.id,
-      userEmail
-    });
+    // Create a simple thread ID based on user email and timestamp
+    const threadId = `email_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    
+    // Log the thread creation
+    await supabase
+      .from('logs')
+      .insert({
+        service: 'coachartie-email',
+        level: 'info',
+        message: `Email thread started for ${userEmail}`,
+        timestamp: createdAt
+      });
 
     return {
-      id: createdThread.id,
-      userEmail: createdThread.user_email,
-      subject: createdThread.subject,
-      createdAt: createdThread.created_at,
-      lastMessageAt: createdThread.last_message_at,
-      messageCount: createdThread.message_count
+      id: threadId,
+      userEmail,
+      subject: subject || 'Email Conversation',
+      createdAt
     };
-
   } catch (error) {
-    logger.error('Failed to get or create thread', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      userEmail,
-      existingThreadId
-    });
+    logger.error('Failed to create thread', { error, userEmail });
+    throw error;
+  }
+}
 
-    // Fallback: return a temporary thread
-    return {
-      id: `temp-${Date.now()}`,
-      userEmail,
-      subject: 'Coaching Conversation',
-      createdAt: new Date().toISOString(),
-      lastMessageAt: new Date().toISOString(),
-      messageCount: 1
-    };
+export async function logEmailEvent(
+  threadId: string,
+  userEmail: string,
+  event: string,
+  details?: any
+): Promise<void> {
+  try {
+    await supabase
+      .from('logs')
+      .insert({
+        service: 'coachartie-email',
+        level: 'info',
+        message: `Thread ${threadId}: ${event}`,
+        timestamp: new Date().toISOString()
+      });
+    
+    logger.info(`Email event logged`, { threadId, userEmail, event, details });
+  } catch (error) {
+    logger.error('Failed to log email event', { error, threadId, userEmail, event });
   }
 }

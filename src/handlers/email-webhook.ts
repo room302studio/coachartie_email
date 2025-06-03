@@ -9,13 +9,13 @@
  */
 
 import { Request, Response } from 'express';
-import { logger } from '../services/logger';
-import { parseIncomingEmail } from '../services/email-parser';
-import { sendEmailResponse } from '../services/email-sender';
-import { processWithCoachArtie } from '../services/coach-artie-client';
-import { getOrCreateThread } from '../services/thread-manager';
+import { logger } from '../services/logger.js';
+import { parseIncomingEmail } from '../services/email-parser.js';
+import { sendEmailResponse } from '../services/email-sender.js';
+import { processWithCoachArtie } from '../services/coach-artie-client.js';
+import { getOrCreateThread } from '../services/thread-manager.js';
 
-export async function emailWebhookHandler(req: Request, res: Response) {
+export async function emailWebhookHandler(req: Request, res: Response): Promise<Response> {
   try {
     logger.info('Incoming email webhook', {
       contentType: req.headers['content-type'],
@@ -62,7 +62,7 @@ export async function emailWebhookHandler(req: Request, res: Response) {
     const sendResult = await sendEmailResponse({
       to: emailData.from,
       subject: emailData.subject.startsWith('Re: ') ? emailData.subject : `Re: ${emailData.subject}`,
-      body: response.data.response,
+      body: response.data?.response || 'No response available',
       inReplyTo: emailData.messageId,
       threadId: thread.id
     });
@@ -74,12 +74,12 @@ export async function emailWebhookHandler(req: Request, res: Response) {
 
     logger.info('Email processed successfully', {
       from: emailData.from,
-      responseId: sendResult.data.messageId
+      responseId: sendResult.data?.messageId
     });
 
-    res.json({
+    return res.json({
       success: true,
-      messageId: sendResult.data.messageId
+      messageId: sendResult.data?.messageId
     });
 
   } catch (error) {
@@ -88,7 +88,7 @@ export async function emailWebhookHandler(req: Request, res: Response) {
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Internal server error'
     });
   }

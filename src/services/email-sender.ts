@@ -5,7 +5,7 @@
  * https://resend.com/docs/api-reference/emails/send-email
  */
 
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 export interface EmailResponse {
   to: string;

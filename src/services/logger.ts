@@ -40,9 +40,12 @@ const loggerConfig: winston.LoggerOptions = {
   ]
 };
 
+// Create logger
+const logger = winston.createLogger(loggerConfig);
+
 // Add Loki transport if configured
 if (process.env.LOKI_URL) {
-  loggerConfig.transports?.push(
+  logger.add(
     new LokiTransport({
       host: process.env.LOKI_URL,
       labels: {
@@ -53,4 +56,4 @@ if (process.env.LOKI_URL) {
   );
 }
 
-export const logger = winston.createLogger(loggerConfig);
+export { logger };
