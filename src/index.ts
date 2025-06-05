@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import { logger } from './services/logger.js';
 import { emailWebhookHandler } from './handlers/email-webhook.js';
 import { healthCheck } from './handlers/health.js';
+import { sendEmailHandler } from './handlers/send-email.js';
 
 // Load environment variables
 dotenv.config();
@@ -23,6 +24,7 @@ app.use(express.raw({ type: 'message/rfc822', limit: '10mb' }));
 
 // Routes
 app.post('/webhook/email', emailWebhookHandler);
+app.post('/send', sendEmailHandler);
 app.get('/health', healthCheck);
 
 // Error handling middleware
