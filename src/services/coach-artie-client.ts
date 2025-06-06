@@ -16,6 +16,7 @@ export interface CoachArtieRequest {
     subject?: string;
     messageId?: string;
     inReplyTo?: string;
+    originalEmail?: string;
   };
 }
 
