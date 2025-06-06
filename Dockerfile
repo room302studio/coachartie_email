@@ -1,24 +1,38 @@
 # Coach Artie Email Interface Docker Container
 
-FROM node:20-alpine
+# Build stage
+FROM node:20-alpine AS builder
 
-# Create app directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev for build)
+# Install ALL dependencies including TypeScript for build
 RUN npm install
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build TypeScript to JavaScript
 RUN npm run build
 
-# Remove dev dependencies after build
-RUN npm prune --omit=dev
+# Production stage
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm install --omit=dev
+
+# Copy built files from builder stage
+COPY --from=builder /app/dist ./dist
 
 # Create logs directory
 RUN mkdir -p logs
@@ -28,7 +42,7 @@ RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodejs -u 1001
 
 # Change ownership of the app directory
-RUN chown -R nodejs:nodejs /usr/src/app
+RUN chown -R nodejs:nodejs /app
 USER nodejs
 
 # Expose port
