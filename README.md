@@ -1,5 +1,19 @@
 # Coach Artie Email Interface
 
+## ⚠️ **ARCHIVED REPOSITORY** ⚠️
+
+**This repository has been archived in favor of our new monorepo architecture.**
+
+**👉 Please visit the new monorepo: [`room302studio/coachartie2`](https://github.com/room302studio/coachartie2)**
+
+The monorepo contains:
+- All services in a single repository
+- Simplified deployment and development
+- Redis queue-based microservices
+- Comprehensive testing and documentation
+
+---
+
 🤖 **TL;DR**: Email your AI coach and get intelligent responses with full conversation memory. Just like Discord but via email.
 
 ## What This Does
